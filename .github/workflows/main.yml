@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Java 21
@@ -24,21 +24,36 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Extract Exact Source
+      - name: Extract Source
+        shell: bash
         run: |
           set -e
+
           mkdir -p source
 
-          unzip -oq DeathDimensionV2.1-FullHP-Food-PickupLock-CompileFix.zip -d source
+          ZIP=$(find . -type f -iname '*.zip' \
+            -not -path './.git/*' -print -quit)
 
-          POM=$(find source -type f -name pom.xml -print -quit)
+          if [ -n "$ZIP" ]; then
+            echo "ZIP ditemukan: $ZIP"
+            unzip -oq "$ZIP" -d source
+          else
+            echo "ZIP tidak ditemukan, mencari source langsung..."
+          fi
+
+          POM=$(find . source -type f -name pom.xml \
+            -not -path './.git/*' -print -quit 2>/dev/null || true)
 
           if [ -z "$POM" ]; then
             echo "pom.xml tidak ditemukan!"
+            echo "File di repository:"
+            find . -maxdepth 4 -type f
             exit 1
           fi
 
-          echo "PROJECT_DIR=$(dirname "$POM")" >> "$GITHUB_ENV"
+          PROJECT_DIR=$(dirname "$POM")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project ditemukan: $PROJECT_DIR"
 
       - name: Build Plugin
         run: mvn -B -f "$PROJECT_DIR/pom.xml" clean package
@@ -46,6 +61,6 @@ jobs:
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: DeathDimension-V2.1-CompileFix
+          name: DeathDimension-V2.1
           path: ${{ env.PROJECT_DIR }}/target/*.jar
           if-no-files-found: error
